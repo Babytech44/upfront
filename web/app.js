@@ -71,7 +71,9 @@
     musd: new ethers.Contract(CFG.musd, ABI.musd, rpc),
   };
 
-  const S = { account: null, signer: null, market: null, offers: [], lookup: null, busy: false };
+  const S = { account: null, signer: null, market: null, offers: [], lookup: null, busy: false, looking: false };
+  // a real Mezo testnet wallet with a locked position, shown when a visitor presses "See an example"
+  const EXAMPLE = '0xC6Bd6baD18F7c31fE002c94010D49cD812E93934';
 
   // ───────────── formatting ─────────────
   const $ = (id) => document.getElementById(id);
@@ -223,7 +225,7 @@
     const ids = await Promise.all([...Array(n).keys()].map((i) => R.ve.ownerToNFTokenIdList(addr, i)));
     const positions = (await Promise.all(ids.map((id) => positionInfo(id)))).filter((p) => p.amount > 0n);
     positions.sort((a, b) => (b.weekly > a.weekly ? 1 : -1));
-    S.lookup = { addr, positions };
+    return { addr, positions };
   }
 
   // ───────────── rendering ─────────────
@@ -398,10 +400,18 @@
 
   function renderLookup() {
     const el = $('positions');
-    if (!S.lookup) { el.innerHTML = ''; return; }
+    if (S.looking) return; // a lookup is on screen as "Reading…"; leave it alone
+    if (!S.lookup) {
+      el.innerHTML = `<div class="empty">Nothing to show yet. Press <b>Use my wallet</b> to see what your own locked Bitcoin can get, or try the calculator on a real position from Mezo testnet.
+        <div class="actions" style="justify-content:center"><button data-example>See an example</button></div></div>`;
+      return;
+    }
     const { addr, positions } = S.lookup;
     const inUpfront = S.offers.filter((o) => same(o.seller, addr) && (o.status === 1 || o.status === 2));
     let html = '';
+    if (same(addr, EXAMPLE) && !same(addr, S.account)) {
+      html += `<div class="note" style="margin-bottom:10px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius);background:var(--card, #fff)"><b>This is an example.</b> It is a real position on Mezo testnet that belongs to someone else. Move the slider to see the numbers. To offer your own locked Bitcoin, press <b>Use my wallet</b>.</div>`;
+    }
     if (inUpfront.length) {
       html += `<div class="note" style="margin-bottom:10px">${inUpfront.length} position${inUpfront.length === 1 ? ' of this wallet is' : 's of this wallet are'} already in Upfront: ${inUpfront.map((o) => `offer #${o.id} (${STATUS[o.status].toLowerCase()})`).join(', ')}. See <a href="#mine">My positions</a>.</div>`;
     }
@@ -434,7 +444,11 @@
   async function refresh() {
     await loadMarket();
     await loadOffers();
-    if (S.lookup) await loadLookup(S.lookup.addr);
+    if (S.lookup) {
+      const a = S.lookup.addr;
+      const found = await loadLookup(a);
+      if (S.lookup && S.lookup.addr === a) S.lookup = found; // unless another wallet was looked up meanwhile
+    }
     renderAll();
   }
 
@@ -563,16 +577,24 @@
     }
   }
 
+  let lookupSeq = 0;
   async function doLookup(addr) {
     addr = cleanAddr(addr);
     if (!addr) { toast('That does not look like a wallet address. It should start with 0x and have 42 characters.', true); return; }
+    const seq = ++lookupSeq;
+    S.looking = true;
     $('positions').innerHTML = '<div class="empty">Reading locked positions from Mezo…</div>';
     try {
       if (!S.market) await loadMarket();
-      await loadLookup(addr);
+      const found = await loadLookup(addr);
+      if (seq !== lookupSeq) return; // a newer lookup started meanwhile
+      S.lookup = found;
+      S.looking = false;
       renderLookup();
     } catch (e) {
       console.error(e);
+      if (seq !== lookupSeq) return;
+      S.looking = false;
       $('positions').innerHTML = '<div class="empty">Could not read this wallet from Mezo. Press Check to try again.</div>';
     }
   }
@@ -581,6 +603,7 @@
   document.addEventListener('click', (ev) => {
     const btn = ev.target.closest('button[data-act]');
     if (btn && !btn.disabled) runAction(btn);
+    if (ev.target.closest('[data-example]')) { $('addr').value = EXAMPLE; doLookup(EXAMPLE); }
   });
   document.addEventListener('input', (ev) => {
     const sell = ev.target.closest('[data-sell]');
@@ -605,7 +628,11 @@
     $('addr').value = S.account;
     doLookup(S.account);
   });
-  $('connect').addEventListener('click', connect);
+  $('connect').addEventListener('click', async () => {
+    if (!(await connect())) return;
+    // after connecting, show the visitor's own positions unless they are looking at another wallet on purpose
+    if (!S.looking && (!S.lookup || same(S.lookup.addr, EXAMPLE))) { $('addr').value = S.account; doLookup(S.account); }
+  });
   if (window.ethereum && window.ethereum.on) {
     window.ethereum.on('accountsChanged', (a) => { S.account = a.length ? ethers.getAddress(a[0]) : null; S.signer = null; renderAll(); });
     window.ethereum.on('chainChanged', () => { S.signer = null; });

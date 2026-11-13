@@ -67,6 +67,8 @@ The seller sells an **amount**, not a number of weeks. Boost comes from veMEZO v
 
 - It reads from Mezo's public RPC, so the numbers, the open offers and every sale in progress show without a wallet.
 - Paste any wallet address to see what its locked positions could get today. A link such as `?wallet=0x...` opens the page with that wallet already checked.
+- A visitor with no locked Bitcoin can press **See an example** to try the calculator on a real testnet position. It is labelled as an example and cannot be offered by anyone but its owner.
+- After **Connect wallet**, the page shows that wallet's own positions straight away.
 - A wallet is asked for only when you press a button that sends a transaction: offer, buy, collect, pay the rest early, cancel.
 - Contract errors are shown in plain words.
 
@@ -80,6 +82,7 @@ python3 -m http.server 8000 --directory web
 `web/test/` holds browser checks written with Playwright:
 
 - `live-checks.js`: 35 checks without a wallet, run in Chromium, Firefox and WebKit. Loading, bad input, wallets with many positions, the sell maths, phone widths, and recovery when Mezo's RPC is unreachable.
+- `example-checks.js`: 21 checks of the example button and of what a visitor sees right after connecting.
 - `fork-checks-1.js` and `fork-checks-2.js`: 35 checks of every wallet action against a local fork of Mezo testnet, with a stand-in wallet that fails the way MetaMask does. They cover the wrong network, refused requests, offer, cancel, buy, collect, settle, a stale page, a position that voted elsewhere, the first hour after a weekly reset, making a timed lock permanent, and returning a position after the time limit.
 - `e2e.js`: the first, shorter run of the main path.
 
