@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Upfront: get your Bitcoin yield today</title>
+<meta name="description" content="Bitcoin locked on Mezo earns MUSD every week. Upfront lets you sell that future income for MUSD today. No loan, no liquidation.">
+<style>
+  :root {
+    --paper: #f8f5ef; --card: #ffffff; --ink: #17130e; --muted: #6d655a; --line: #e4ddd0;
+    --accent: #f7931a; --accent-ink: #7a4300; --good: #1c7c4a; --good-bg: #e6f4ec; --warn: #9a5b00; --warn-bg: #fdf1dc; --bad: #a12a2a; --bad-bg: #fbe9e9;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  a { color: inherit; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+  header.top { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 20px; letter-spacing: -0.01em; text-decoration: none; }
+  .brand .dot { width: 26px; height: 26px; border-radius: 50%; background: var(--accent); display: grid; place-items: center; color: #fff; font-size: 15px; }
+  .net { font-size: 12px; padding: 3px 8px; border-radius: 99px; background: var(--warn-bg); color: var(--warn); font-weight: 600; }
+  nav.links { display: flex; gap: 18px; align-items: center; font-size: 14px; }
+  nav.links a { text-decoration: none; color: var(--muted); }
+  nav.links a:hover { color: var(--ink); }
+  button { font: inherit; cursor: pointer; border-radius: 10px; border: 1px solid var(--ink); background: var(--ink); color: #fff; padding: 10px 16px; font-weight: 600; }
+  button.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+  button.small { padding: 6px 12px; font-size: 14px; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .hero { padding: 34px 0 10px; }
+  h1 { font: 700 clamp(34px, 6vw, 58px)/1.04 "Iowan Old Style", "Palatino Linotype", Georgia, serif; letter-spacing: -0.02em; margin: 0 0 14px; }
+  h1 em { font-style: normal; color: var(--accent-ink); box-shadow: inset 0 -0.32em 0 #ffe2b8; }
+  .lede { font-size: 19px; color: #3d362c; max-width: 660px; margin: 0 0 22px; }
+  .pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 26px; }
+  .pill { font-size: 13px; padding: 5px 11px; border-radius: 99px; border: 1px solid var(--line); background: var(--card); color: #3d362c; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 8px 0 30px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+  .stat .k { font-size: 12.5px; color: var(--muted); }
+  .stat .v { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; margin-top: 2px; }
+  .stat .s { font-size: 12.5px; color: var(--muted); }
+  section { padding: 26px 0; border-top: 1px solid var(--line); }
+  h2 { font: 700 28px/1.15 "Iowan Old Style", "Palatino Linotype", Georgia, serif; letter-spacing: -0.01em; margin: 0 0 6px; }
+  .sub { color: var(--muted); margin: 0 0 18px; max-width: 700px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .lookup { display: flex; gap: 8px; flex-wrap: wrap; }
+  input[type=text], input[type=number], select { font: inherit; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: #fff; color: var(--ink); min-width: 0; }
+  .lookup input { flex: 1 1 320px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .row { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; padding: 5px 0; }
+  .row .k { color: var(--muted); font-size: 14.5px; }
+  .row .v { font-weight: 600; text-align: right; }
+  .big { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; }
+  .big small { font-size: 15px; font-weight: 600; color: var(--muted); }
+  .tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 99px; background: #efeae0; color: #4a4338; }
+  .tag.good { background: var(--good-bg); color: var(--good); }
+  .tag.warn { background: var(--warn-bg); color: var(--warn); }
+  .tag.bad { background: var(--bad-bg); color: var(--bad); }
+  .note { font-size: 13.5px; color: var(--muted); }
+  .note.warn { color: var(--warn); }
+  .bar { height: 8px; border-radius: 99px; background: #efeae0; overflow: hidden; margin: 8px 0 4px; }
+  .bar > i { display: block; height: 100%; background: var(--good); border-radius: 99px; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+  .empty { color: var(--muted); padding: 18px; text-align: center; border: 1px dashed var(--line); border-radius: var(--radius); }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; counter-reset: s; }
+  .step { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
+  .step::before { counter-increment: s; content: counter(s); display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--ink); color: #fff; font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+  .step b { display: block; margin-bottom: 2px; }
+  .step span { font-size: 14px; color: #4a4338; }
+  ul.plain { margin: 0; padding-left: 18px; color: #3d362c; }
+  ul.plain li { margin: 4px 0; }
+  #toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 12px 16px; border-radius: 12px; max-width: min(560px, 92vw); font-size: 14.5px; display: none; z-index: 10; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
+  #toast a { color: #ffd596; }
+  #toast.err { background: var(--bad); }
+  footer { padding: 26px 0 50px; color: var(--muted); font-size: 13.5px; border-top: 1px solid var(--line); }
+  @media (max-width: 760px) { .stats, .steps { grid-template-columns: 1fr 1fr; } .grid2 { grid-template-columns: 1fr; } nav.links a { display: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="#"><span class="dot">₿</span> Upfront <span class="net">Mezo Testnet</span></a>
+    <nav class="links">
+      <a href="#sell">Sell</a><a href="#buy">Buy</a><a href="#mine">My positions</a><a href="#how">How it works</a>
+      <button id="connect" class="small">Connect wallet</button>
+    </nav>
+  </header>
+
+  <div class="hero">
+    <h1>Get your Bitcoin yield <em>today</em>.</h1>
+    <p class="lede">Bitcoin locked on Mezo earns MUSD every week. Sell the next weeks of that income for MUSD now, and get your position back when it has paid.</p>
+    <div class="pills"><span class="pill">No loan</span><span class="pill">No interest</span><span class="pill">No liquidation</span><span class="pill">Your Bitcoin never leaves its lock</span></div>
+  </div>
+
+  <div class="stats" id="stats">
+    <div class="stat"><div class="k">Mezo pays lockers this week</div><div class="v" id="st-pay">…</div><div class="s">MUSD, to savings-vault voters</div></div>
+    <div class="stat"><div class="k">1 locked BTC earns about</div><div class="v" id="st-btc">…</div><div class="s">MUSD a week at 1x boost</div></div>
+    <div class="stat"><div class="k">Paid to buyers so far</div><div class="v" id="st-paid">…</div><div class="s" id="st-offers">MUSD</div></div>
+    <div class="stat"><div class="k">Next weekly payout</div><div class="v" id="st-next">…</div><div class="s" id="st-next-date">Thursday 00:00 UTC</div></div>
+  </div>
+
+  <section id="sell">
+    <h2>Sell: see what your locked Bitcoin can get today</h2>
+    <p class="sub">Paste any wallet to look, no connection needed. Connect the wallet to make an offer.</p>
+    <div class="lookup">
+      <input id="addr" type="text" placeholder="0x… wallet address" spellcheck="false" autocomplete="off">
+      <button id="check">Check</button>
+      <button id="useMine" class="ghost">Use my wallet</button>
+    </div>
+    <div id="positions" style="margin-top:16px"></div>
+  </section>
+
+  <section id="buy">
+    <h2>Buy: pay MUSD now, receive more MUSD from Mezo</h2>
+    <p class="sub">Each offer is a locked-Bitcoin position held by the Upfront contract. Its weekly MUSD goes to you until you have received the full amount.</p>
+    <div id="offers"><div class="empty">Loading offers from Mezo…</div></div>
+  </section>
+
+  <section id="mine">
+    <h2>My positions</h2>
+    <p class="sub">Offers you made and offers you bought.</p>
+    <div id="mineList"><div class="empty">Connect a wallet to see your offers.</div></div>
+  </section>
+
+  <section id="how">
+    <h2>How it works</h2>
+    <p class="sub">One small contract. It holds the position, collects its MUSD from Mezo, and hands the position back.</p>
+    <div class="steps">
+      <div class="step"><b>Offer</b><span>Pick how much MUSD you want today. Your position moves into the contract. MUSD it already earned is paid to you first.</span></div>
+      <div class="step"><b>Buy</b><span>A buyer pays. You receive the MUSD at once, less a 1% fee. The contract votes the position for Mezo's savings-vault gauge.</span></div>
+      <div class="step"><b>Collect</b><span>Every Thursday Mezo pays the position. Anyone can press Collect, and the MUSD goes to the buyer.</span></div>
+      <div class="step"><b>Back to you</b><span>When the buyer has received the agreed amount, the position returns. You can also pay the rest early.</span></div>
+    </div>
+    <div class="grid2" style="margin-top:14px">
+      <div class="card">
+        <b>What the buyer should know</b>
+        <ul class="plain">
+          <li>The weekly payout is set by Mezo and can change. If it falls, you are repaid more slowly.</li>
+          <li>Each offer has a time limit. After it, the position returns to the seller even if you have not received everything.</li>
+          <li>Upfront has not been audited.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <b>What Upfront does not do</b>
+        <ul class="plain">
+          <li>No pooled vault: every sale is one seller and one buyer.</li>
+          <li>No price oracle and no liquidation.</li>
+          <li>No admin keys, no upgrades. The 1% fee is fixed in the contract.</li>
+          <li>Permanent locks only, for now.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Contract: <a class="mono" id="f-contract" target="_blank" rel="noopener"></a> · source verified on the Mezo explorer ·
+    built for the Mezo Buildathon. Testnet only: test BTC and test MUSD have no value.
+  </footer>
+</div>
+<div id="toast"></div>
+<script src="ethers.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
