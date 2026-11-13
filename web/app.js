@@ -80,6 +80,8 @@
   const fmtBtc = (x) => num(x).toLocaleString('en-US', { maximumFractionDigits: 5 });
   const short = (a) => a.slice(0, 6) + '…' + a.slice(-4);
   const same = (a, b) => a && b && a.toLowerCase() === b.toLowerCase();
+  const cleanAddr = (a) => { a = (a || '').trim(); return /^0x[0-9a-fA-F]{40}$/i.test(a) ? ethers.getAddress('0x' + a.slice(2).toLowerCase()) : null; };
+  const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const txLink = (h) => `<a href="${CFG.explorer}/tx/${h}" target="_blank" rel="noopener">View transaction</a>`;
   const boostText = (b) => (b > 0n ? (Number(b) / 1e18).toFixed(2).replace(/\.?0+$/, '') : '1') + 'x boost';
   const weeksText = (w) => (w === Infinity ? 'never at this rate' : w <= 1 ? 'about 1 week' : `about ${w} weeks`);
@@ -90,7 +92,12 @@
     const m = Math.floor(s / 60);
     return d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : `${m}m`;
   }
-  const dateText = (ts) => new Date(ts * 1000).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' }) + ' UTC';
+  const dateText = (ts) => {
+    const d = new Date(ts * 1000);
+    const o = { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'UTC' };
+    if (d.getUTCFullYear() !== new Date().getUTCFullYear()) o.year = 'numeric';
+    return d.toLocaleString('en-GB', o) + ' UTC';
+  };
 
   // ───────────── toast and errors ─────────────
   let toastTimer;
@@ -122,15 +129,31 @@
     NotApprovedOrOwner: 'The contract is not approved to move this position yet.',
   };
   const SELECTORS = Object.fromEntries(Object.keys(ERRORS).map((n) => [ethers.id(n + '()').slice(0, 10), n]));
+  // Wallets wrap a contract's error in different places, so look through the whole error for a known code.
+  function findError(e, depth = 0) {
+    if (!e || depth > 5) return null;
+    if (typeof e === 'string') {
+      for (const m of e.match(/0x[0-9a-fA-F]{8}/g) || []) if (SELECTORS[m.toLowerCase()]) return SELECTORS[m.toLowerCase()];
+      return null;
+    }
+    if (typeof e !== 'object') return null;
+    for (const k of ['data', 'error', 'info', 'payload', 'cause', 'revert', 'originalError', 'message', 'body']) {
+      let v; try { v = e[k]; } catch (x) { continue; }
+      const name = findError(v, depth + 1);
+      if (name) return name;
+    }
+    return null;
+  }
   function explain(e) {
-    if (e && (e.code === 'ACTION_REJECTED' || e.code === 4001 || (e.info && e.info.error && e.info.error.code === 4001))) return 'You cancelled the request in your wallet.';
-    const data = (e && (e.data || (e.info && e.info.error && e.info.error.data) || (e.error && e.error.data))) || '';
-    const name = typeof data === 'string' ? SELECTORS[data.slice(0, 10)] : null;
+    const inner = e && e.info && e.info.error;
+    if (e && (e.code === 'ACTION_REJECTED' || e.code === 4001 || (inner && inner.code === 4001))) return 'You cancelled the request in your wallet.';
+    const name = findError(e);
     if (name) return ERRORS[name];
     const msg = (e && (e.shortMessage || e.message)) || String(e);
     if (/insufficient funds/i.test(msg)) return 'Not enough test BTC in this wallet to pay for gas.';
-    if (/failed to fetch|network/i.test(msg)) return 'Could not reach the Mezo network. Try again.';
-    return msg.length > 180 ? msg.slice(0, 180) + '…' : msg;
+    if (/failed to fetch|network|timeout/i.test(msg)) return 'Could not reach the Mezo network. Try again.';
+    if (e && e.code === 'CALL_EXCEPTION') return 'Mezo refused this transaction. The offer may have changed: refresh the page and try again.';
+    return esc(msg.length > 180 ? msg.slice(0, 180) + '…' : msg);
   }
 
   // ───────────── reads ─────────────
@@ -138,12 +161,14 @@
     const block = await rpc.getBlock('latest');
     const now = Number(block.timestamp);
     const es = now - (now % WEEK);
-    const [r0, r1, w] = await Promise.all([
-      R.fees.tokenRewardsPerEpoch(CFG.musd, es),
-      R.fees.tokenRewardsPerEpoch(CFG.musd, es - WEEK),
+    // Mezo posts the week's MUSD in one amount a few hours after each reset, and has skipped a week before.
+    // Until this week's amount is posted, use the most recent week that has one.
+    const [w, ...r] = await Promise.all([
       R.voter.weights(CFG.pool),
+      ...[0, 1, 2, 3].map((k) => R.fees.tokenRewardsPerEpoch(CFG.musd, es - k * WEEK)),
     ]);
-    S.market = { now, es, next: es + WEEK, reward: r0 > 0n ? r0 : r1, weight: w };
+    const k = r.findIndex((x) => x > 0n);
+    S.market = { now, es, next: es + WEEK, reward: k < 0 ? 0n : r[k], posted: k === 0, weight: w };
     return S.market;
   }
 
@@ -205,6 +230,8 @@
   function renderStats() {
     const m = S.market;
     $('st-pay').textContent = fmt(m.reward, 0);
+    $('st-pay-k').textContent = m.posted ? 'Mezo pays lockers this week' : 'Mezo paid lockers last time';
+    $('st-pay-s').textContent = m.posted ? 'MUSD, to savings-vault voters' : "MUSD. This week's amount is not posted yet";
     const oneBtc = m.weight + E18 > 0n ? (m.reward * E18) / (m.weight + E18) : 0n;
     $('st-btc').textContent = fmt(oneBtc, 0);
     const paid = S.offers.reduce((a, o) => a + o.paid, 0n);
@@ -240,7 +267,7 @@
       <div class="row"><span class="k">Time limit</span><span class="v">${o.maxWeeks} weeks from purchase</span></div>
       <div style="margin-top:8px">
         <div class="note">What if Mezo's weekly payout changes? <b><span data-whatif-label>100%</span> of today's payout</b></div>
-        <input type="range" min="10" max="100" step="5" value="100" data-whatif="${o.id}">
+        <input type="range" min="10" max="100" step="5" value="100" data-whatif="${o.id}" aria-label="Share of today's weekly payout">
         <div class="note" data-whatif-out>Paid back in ${weeksText(weeks)}.</div>
       </div>
       ${p.blocked ? `<div class="note warn" style="margin-top:8px">${p.blocked}</div>` : ''}
@@ -328,10 +355,10 @@
       ${head}
       <div style="margin-top:10px">
         <div class="note">How many weeks of income do you want today? <b><span data-weeks-label>4</span> weeks</b></div>
-        <input type="range" min="1" max="12" step="1" value="4" data-weeks>
+        <input type="range" min="1" max="12" step="1" value="4" data-weeks aria-label="Weeks of income to sell">
       </div>
       <div class="row"><span class="k">Buyer's reward for waiting</span>
-        <select data-reward><option value="5">5%</option><option value="10" selected>10%</option><option value="15">15%</option><option value="20">20%</option></select></div>
+        <select data-reward aria-label="Buyer's reward for waiting"><option value="5">5%</option><option value="10" selected>10%</option><option value="15">15%</option><option value="20">20%</option></select></div>
       <div style="margin:8px 0"><div class="note">You get, when a buyer accepts</div><div class="big" style="color:var(--good)"><span data-get>…</span> <small>MUSD</small></div></div>
       <div class="row"><span class="k">Buyer pays</span><span class="v"><span data-price></span> MUSD</span></div>
       <div class="row"><span class="k">Buyer receives from your position</span><span class="v"><span data-owed></span> MUSD</span></div>
@@ -433,7 +460,7 @@
 
   async function ensureChain() {
     const current = await window.ethereum.request({ method: 'eth_chainId' });
-    if (current === CFG.chainHex) return;
+    if (String(current).toLowerCase() === CFG.chainHex || Number(current) === CFG.chainId) return;
     try {
       await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: CFG.chainHex }] });
     } catch (e) {
@@ -462,6 +489,8 @@
     const tx = await fn();
     toast(`${label}: waiting for Mezo… ${txLink(tx.hash)}`, false, true);
     await tx.wait();
+    // the page reads from Mezo's public RPC, which can be a block behind the wallet's: wait until it has the transaction too
+    await rpc.waitForTransaction(tx.hash, 1, 20000).catch(() => {});
     return tx.hash;
   }
 
@@ -535,16 +564,16 @@
   }
 
   async function doLookup(addr) {
-    addr = (addr || '').trim();
-    if (!ethers.isAddress(addr)) { toast('That does not look like a wallet address. It should start with 0x and have 42 characters.', true); return; }
+    addr = cleanAddr(addr);
+    if (!addr) { toast('That does not look like a wallet address. It should start with 0x and have 42 characters.', true); return; }
     $('positions').innerHTML = '<div class="empty">Reading locked positions from Mezo…</div>';
     try {
       if (!S.market) await loadMarket();
-      await loadLookup(ethers.getAddress(addr.toLowerCase()));
+      await loadLookup(addr);
       renderLookup();
     } catch (e) {
       console.error(e);
-      $('positions').innerHTML = `<div class="empty">Could not read from Mezo: ${explain(e)}</div>`;
+      $('positions').innerHTML = '<div class="empty">Could not read this wallet from Mezo. Press Check to try again.</div>';
     }
   }
 
@@ -583,23 +612,37 @@
   }
 
   // ───────────── start ─────────────
-  (async () => {
+  let started = false;
+  async function start() {
     try {
       await refresh();
-      const q = new URLSearchParams(location.search).get('wallet');
-      if (q && ethers.isAddress(q)) { $('addr').value = q; doLookup(q); }
-      if (window.ethereum) {
-        const accounts = await window.ethereum.request({ method: 'eth_accounts' }).catch(() => []);
-        if (accounts.length) { S.account = ethers.getAddress(accounts[0]); renderAll(); }
-      }
     } catch (e) {
-      console.error(e);
-      $('offers').innerHTML = `<div class="empty">Could not reach the Mezo network: ${explain(e)} Reload to try again.</div>`;
+      console.warn('Mezo RPC not reachable, retrying', e && (e.shortMessage || e.message));
+      $('offers').innerHTML = '<div class="empty">Could not reach the Mezo network. Trying again every few seconds…</div>';
+      setTimeout(start, 5000);
+      return;
+    }
+    if (started) return;
+    started = true;
+    const q = cleanAddr(new URLSearchParams(location.search).get('wallet'));
+    if (q) { $('addr').value = q; doLookup(q); }
+    if (window.ethereum) {
+      const accounts = await window.ethereum.request({ method: 'eth_accounts' }).catch(() => []);
+      if (accounts && accounts.length) { S.account = ethers.getAddress(accounts[0]); renderAll(); }
     }
     // keep the numbers fresh without resetting a form the visitor is filling in
     setInterval(async () => {
       if (S.busy) return;
-      try { await loadMarket(); await loadOffers(); renderStats(); renderOffers(); renderMine(); } catch (e) { /* try again next minute */ }
+      try {
+        await loadMarket(); await loadOffers();
+        const kept = [...document.querySelectorAll('[data-whatif]')].map((e) => [e.dataset.whatif, e.value]);
+        renderStats(); renderOffers(); renderMine();
+        for (const [id, v] of kept) {
+          const e = document.querySelector(`[data-whatif="${id}"]`);
+          if (e && v !== '100') { e.value = v; e.dispatchEvent(new Event('input', { bubbles: true })); }
+        }
+      } catch (e) { /* try again next minute */ }
     }, 60000);
-  })();
+  }
+  start();
 })();

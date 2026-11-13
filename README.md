@@ -61,7 +61,13 @@ python3 -m http.server 8000 --directory web
 # open http://localhost:8000
 ```
 
-`web/test/e2e.js` drives the page in a headless browser against a local fork of Mezo testnet with a stand-in wallet. It covers offer, buy, buy without funds, collect in full, collect in part, settle early, offer again and cancel. The header of the file has the commands.
+`web/test/` holds browser checks written with Playwright:
+
+- `live-checks.js`: 35 checks without a wallet, run in Chromium, Firefox and WebKit. Loading, bad input, wallets with many positions, the sell maths, phone widths, and recovery when Mezo's RPC is unreachable.
+- `fork-checks-1.js` and `fork-checks-2.js`: 35 checks of every wallet action against a local fork of Mezo testnet, with a stand-in wallet that fails the way MetaMask does. They cover the wrong network, refused requests, offer, cancel, buy, collect, settle, a stale page, a position that voted elsewhere, the first hour after a weekly reset, making a timed lock permanent, and returning a position after the time limit.
+- `e2e.js`: the first, shorter run of the main path.
+
+The header of each file has the commands.
 
 ## Tests
 

@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Upfront: get your Bitcoin yield today</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='32' fill='%23f7931a'/%3E%3Ctext x='32' y='45' font-size='38' font-family='Arial,sans-serif' font-weight='700' text-anchor='middle' fill='%23fff'%3E%E2%82%BF%3C/text%3E%3C/svg%3E">
+<meta property="og:title" content="Upfront: get your Bitcoin yield today">
+<meta property="og:description" content="Sell the next weeks of your locked-Bitcoin income on Mezo for MUSD now. No loan, no interest, no liquidation.">
+<meta property="og:type" content="website">
 <meta name="description" content="Bitcoin locked on Mezo earns MUSD every week. Upfront lets you sell that future income for MUSD today. No loan, no liquidation.">
 <style>
   :root {
@@ -75,6 +79,9 @@
   #toast.err { background: var(--bad); }
   footer { padding: 26px 0 50px; color: var(--muted); font-size: 13.5px; border-top: 1px solid var(--line); }
   @media (max-width: 760px) { .stats, .steps { grid-template-columns: 1fr 1fr; } .grid2 { grid-template-columns: 1fr; } nav.links a { display: none; } }
+  #connect, .brand .net { white-space: nowrap; }
+  footer .mono { overflow-wrap: anywhere; }
+  @media (max-width: 400px) { .brand .net { display: none; } }
 </style>
 </head>
 <body>
@@ -94,7 +101,7 @@
   </div>
 
   <div class="stats" id="stats">
-    <div class="stat"><div class="k">Mezo pays lockers this week</div><div class="v" id="st-pay">…</div><div class="s">MUSD, to savings-vault voters</div></div>
+    <div class="stat"><div class="k" id="st-pay-k">Mezo pays lockers this week</div><div class="v" id="st-pay">…</div><div class="s" id="st-pay-s">MUSD, to savings-vault voters</div></div>
     <div class="stat"><div class="k">1 locked BTC earns about</div><div class="v" id="st-btc">…</div><div class="s">MUSD a week at 1x boost</div></div>
     <div class="stat"><div class="k">Paid to buyers so far</div><div class="v" id="st-paid">…</div><div class="s" id="st-offers">MUSD</div></div>
     <div class="stat"><div class="k">Next weekly payout</div><div class="v" id="st-next">…</div><div class="s" id="st-next-date">Thursday 00:00 UTC</div></div>
@@ -104,7 +111,7 @@
     <h2>Sell: see what your locked Bitcoin can get today</h2>
     <p class="sub">Paste any wallet to look, no connection needed. Connect the wallet to make an offer.</p>
     <div class="lookup">
-      <input id="addr" type="text" placeholder="0x… wallet address" spellcheck="false" autocomplete="off">
+      <input id="addr" type="text" placeholder="0x… wallet address" aria-label="Wallet address to check" spellcheck="false" autocomplete="off">
       <button id="check">Check</button>
       <button id="useMine" class="ghost">Use my wallet</button>
     </div>
