@@ -460,6 +460,7 @@
     renderMine();
     renderLookup();
     $('connect').textContent = S.account ? short(S.account) : 'Connect wallet';
+    $('walletAddr').textContent = S.account || '';
   }
 
   async function refresh() {
@@ -474,16 +475,65 @@
   }
 
   // ───────────── wallet ─────────────
+  // "Disconnect" is remembered here, so a wallet that cannot revoke its permission does not reconnect by itself
+  const OFF_KEY = 'upfront-disconnected';
+  const isOff = () => { try { return localStorage.getItem(OFF_KEY) === '1'; } catch (e) { return false; } };
+  const setOff = (v) => { try { if (v) localStorage.setItem(OFF_KEY, '1'); else localStorage.removeItem(OFF_KEY); } catch (e) { /* storage blocked: nothing to remember */ } };
+  // true when a wallet answers that it does not know a request (as opposed to the visitor refusing it)
+  const cannotDo = (e) => { const c = codesOf(e); return !c.includes(4001) && (c.includes(-32601) || c.includes(4200) || /not (supported|available|exist)|unsupported|unknown method|does not exist/i.test(messagesOf(e).join(' | '))); };
+
+  function closeMenu() { $('walletMenu').hidden = true; $('connect').setAttribute('aria-expanded', 'false'); }
+  function showMine() {
+    if (S.account && !S.looking && (!S.lookup || same(S.lookup.addr, EXAMPLE))) { $('addr').value = S.account; doLookup(S.account); }
+  }
+  // one place where the connected account changes, so the page follows the wallet
+  function setAccount(next) {
+    const prev = S.account;
+    S.account = next;
+    closeMenu();
+    renderAll();
+    if (prev && !same(prev, next) && S.lookup && same(S.lookup.addr, prev) && !S.looking) {
+      if (next) { $('addr').value = next; doLookup(next); } else { S.lookup = null; $('addr').value = ''; renderLookup(); }
+    }
+  }
+  async function switchAccount() {
+    closeMenu();
+    try {
+      await window.ethereum.request({ method: 'wallet_requestPermissions', params: [{ eth_accounts: {} }] });
+      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+      if (!accounts || !accounts.length) return;
+      await ensureChain();
+      setOff(false);
+      setAccount(ethers.getAddress(accounts[0]));
+      showMine();
+      toast(`Now using ${short(S.account)}.`);
+    } catch (e) {
+      toast(cannotDo(e) ? 'This wallet cannot switch accounts from a website. Change the account inside the wallet instead.' : explain(e), true);
+    }
+  }
+  async function disconnect() {
+    closeMenu();
+    try { await window.ethereum.request({ method: 'wallet_revokePermissions', params: [{ eth_accounts: {} }] }); }
+    catch (e) { /* older wallets cannot revoke: the account is forgotten on this site only */ }
+    setOff(true);
+    setAccount(null);
+    toast('Disconnected. Press Connect wallet to choose an account.');
+  }
   async function connect() {
     if (!window.ethereum) {
       toast('No wallet found in this browser. Install MetaMask or another wallet, then reload.', true);
       return false;
     }
     try {
+      if (isOff()) {
+        // the visitor disconnected on this site earlier: ask the wallet to show its account picker again
+        try { await window.ethereum.request({ method: 'wallet_requestPermissions', params: [{ eth_accounts: {} }] }); }
+        catch (e) { if (!cannotDo(e)) throw e; } // a wallet without that request just connects as usual
+      }
       const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
       await ensureChain();
-      S.account = ethers.getAddress(accounts[0]);
-      renderAll();
+      setOff(false);
+      setAccount(ethers.getAddress(accounts[0]));
       return true;
     } catch (e) {
       toast(explain(e), true);
@@ -677,13 +727,26 @@
     $('addr').value = S.account;
     doLookup(S.account);
   });
-  $('connect').addEventListener('click', async () => {
+  $('connect').addEventListener('click', async (ev) => {
+    if (S.account) { // already connected: the button opens a small menu
+      ev.stopPropagation();
+      const menu = $('walletMenu');
+      menu.hidden = !menu.hidden;
+      $('connect').setAttribute('aria-expanded', String(!menu.hidden));
+      return;
+    }
     if (!(await connect())) return;
-    // after connecting, show the visitor's own positions unless they are looking at another wallet on purpose
-    if (!S.looking && (!S.lookup || same(S.lookup.addr, EXAMPLE))) { $('addr').value = S.account; doLookup(S.account); }
+    showMine(); // after connecting, show the visitor's own positions unless they are looking at another wallet on purpose
   });
+  $('switchAcct').addEventListener('click', switchAccount);
+  $('disconnect').addEventListener('click', disconnect);
+  document.addEventListener('click', (ev) => { if (!ev.target.closest('.wallet')) closeMenu(); });
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeMenu(); });
   if (window.ethereum && window.ethereum.on) {
-    window.ethereum.on('accountsChanged', (a) => { S.account = a.length ? ethers.getAddress(a[0]) : null; renderAll(); });
+    window.ethereum.on('accountsChanged', (a) => {
+      if (isOff() && a.length) return; // disconnected here on purpose: wait for Connect wallet
+      setAccount(a.length ? ethers.getAddress(a[0]) : null);
+    });
   }
 
   // ───────────── start ─────────────
@@ -701,9 +764,9 @@
     started = true;
     const q = cleanAddr(new URLSearchParams(location.search).get('wallet'));
     if (q) { $('addr').value = q; doLookup(q); }
-    if (window.ethereum) {
+    if (window.ethereum && !isOff()) {
       const accounts = await window.ethereum.request({ method: 'eth_accounts' }).catch(() => []);
-      if (accounts && accounts.length) { S.account = ethers.getAddress(accounts[0]); renderAll(); }
+      if (accounts && accounts.length) { S.account = ethers.getAddress(accounts[0]); renderAll(); showMine(); } // a returning visitor sees their own positions
     }
     // keep the numbers fresh without resetting a form the visitor is filling in
     setInterval(async () => {

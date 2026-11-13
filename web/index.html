@@ -80,6 +80,11 @@
   footer { padding: 26px 0 50px; color: var(--muted); font-size: 13.5px; border-top: 1px solid var(--line); }
   @media (max-width: 760px) { .stats, .steps { grid-template-columns: 1fr 1fr; } .grid2 { grid-template-columns: 1fr; } nav.links a { display: none; } }
   #connect, .brand .net { white-space: nowrap; }
+  .wallet { position: relative; }
+  .menu { position: absolute; right: 0; top: calc(100% + 8px); width: 230px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; display: grid; gap: 8px; box-shadow: 0 10px 28px rgba(23, 19, 14, 0.14); z-index: 30; }
+  .menu[hidden] { display: none; }
+  .menu button { width: 100%; padding: 9px 12px; font-size: 14px; }
+  .menu-addr { font-size: 12px; overflow-wrap: anywhere; color: var(--ink); margin-bottom: 2px; }
   footer .mono { overflow-wrap: anywhere; }
   @media (max-width: 400px) { .brand .net { display: none; } }
 </style>
@@ -90,7 +95,15 @@
     <a class="brand" href="#"><span class="dot">₿</span> Upfront <span class="net">Mezo Testnet</span></a>
     <nav class="links">
       <a href="#sell">Sell</a><a href="#buy">Buy</a><a href="#mine">My positions</a><a href="#how">How it works</a>
-      <button id="connect" class="small">Connect wallet</button>
+      <span class="wallet">
+        <button id="connect" class="small" aria-haspopup="true" aria-expanded="false">Connect wallet</button>
+        <div id="walletMenu" class="menu" hidden>
+          <div class="note">Connected wallet</div>
+          <div class="mono menu-addr" id="walletAddr"></div>
+          <button id="switchAcct" class="ghost">Switch account</button>
+          <button id="disconnect" class="ghost">Disconnect</button>
+        </div>
+      </span>
     </nav>
   </header>
 

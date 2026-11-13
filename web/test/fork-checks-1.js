@@ -3,7 +3,8 @@
    making a timed lock permanent.
 
    Needs a local fork of Mezo testnet and the page served locally:
-     anvil --fork-url https://rpc.test.mezo.org --auto-impersonate --chain-id 31611
+     anvil --fork-url https://rpc.test.mezo.org --fork-block-number 16751600 --auto-impersonate --chain-id 31611
+       (the block is pinned because the checks name offers and positions as they stood then)
      cast rpc anvil_mine 0x1
      python3 -m http.server 8765 --directory web
    Give the test accounts gas (anvil_setBalance) and send the buyer 40,000 test MUSD from a large holder first.
@@ -46,7 +47,8 @@ async function open(browser, account, query = '', opts = {}) {
       emit(ev, v) { (subs[ev] || []).forEach((f) => f(v)); },
       async request({ method, params }) {
         w.calls.push(method);
-        if (method === 'eth_requestAccounts' || method === 'eth_accounts') return w.acct ? [w.acct.toLowerCase()] : [];
+        if (method === 'eth_requestAccounts') w.locked = false; // "locked": the site has not been allowed to see the account yet
+        if (method === 'eth_requestAccounts' || method === 'eth_accounts') return w.acct && !w.locked ? [w.acct.toLowerCase()] : [];
         if (method === 'eth_chainId') return w.chain;
         if (method === 'wallet_switchEthereumChain') {
           if (w.rejectSwitch) throw mmErr(4001, 'User rejected the request.');
@@ -84,7 +86,7 @@ const warp = async (ts) => { await rpc('evm_setNextBlockTimestamp', ['0x' + Math
   let p, t;
 
   // T1 wrong network
-  p = await open(b, A.SELLER2, '?wallet=' + A.SELLER2, { chain: '0x1', rejectSwitch: true });
+  p = await open(b, A.SELLER2, '?wallet=' + A.SELLER2, { chain: '0x1', rejectSwitch: true, locked: true });
   t = await act(p, '#connect');
   ok('T1a wrong network, switch refused: clear message', /cancelled/.test(t) && (await p.evaluate(() => window.__w.chain)) === '0x1', t);
   await p.evaluate(() => { window.__w.rejectSwitch = false; window.__w.unknownChain = true; });
