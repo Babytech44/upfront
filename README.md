@@ -4,11 +4,27 @@
 
 Mezo Buildathon, Wave 2. Track: DeFi. Status: deployed and source-verified on Mezo testnet.
 
+## In plain terms: rent paid in advance
+
+Think of a landlord. The house earns rent every month, but the landlord needs money today. Someone pays the next three months of rent now, at a small discount, and collects the rent from the tenant until they have received what was agreed. The landlord never sells the house and owes nothing.
+
+Upfront does the same for Bitcoin locked on Mezo:
+
+| In the story | On Mezo |
+|---|---|
+| The house | Your locked Bitcoin (veBTC). It stays locked and is never sold. |
+| The rent | The MUSD that Mezo pays the position every week. |
+| The landlord | The seller, who gets MUSD today. |
+| The person who pays in advance | The buyer, who receives the weekly MUSD until paid. |
+| The agent holding the papers | The Upfront contract. It hands the position back once the buyer has been paid. |
+
+One difference: this rent is not fixed. Mezo sets it each week. If it falls, the buyer waits longer, and the seller never owes a top-up.
+
 | | |
 |---|---|
 | Live app | **https://upfront-black.vercel.app** (works without a wallet) |
 | Repository | https://github.com/Babytech44/upfront |
-| Deck | [deck/Upfront-deck.pdf](deck/Upfront-deck.pdf) (10 slides) |
+| Deck | [deck/Upfront-deck.pdf](deck/Upfront-deck.pdf) (11 slides) |
 | Contract (Mezo testnet, 31611) | [`0x5D62b7E4c0Aa860F47A8Ab8B9410986A1fFd8b17`](https://explorer.test.mezo.org/address/0x5D62b7E4c0Aa860F47A8Ab8B9410986A1fFd8b17) |
 | Source | Verified on the explorer (0.8.28, london, optimizer 200). The deployed bytecode matches this repo's build. |
 | First position offered | veBTC #1744 (0.02 BTC, permanent) |
