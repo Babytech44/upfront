@@ -105,6 +105,34 @@ const ready = (p) => p.waitForFunction(() => !document.getElementById('st-pay').
     ok(`[${tag}] after reconnecting, a reload keeps the wallet connected`, (await label(p)) === want, await label(p));
     await c.close();
   }
+  // a position that belongs to another account than the connected one: the card says so and offers the way out
+  { const OWNER = '0x58C6A45AcFCc1fD0E5A103Cab2caE00b0B188EC5';
+    const c = await b.newContext({ viewport: { width: 1200, height: 800 } }); const p = await c.newPage();
+    p.on('pageerror', (e) => errs.push('mismatch: ' + e.message));
+    await p.addInitScript(mock, [A, B, true]);
+    await p.goto(URL + '/', { waitUntil: 'load' }); await ready(p);
+    await p.fill('#addr', OWNER); await p.click('#check');
+    await p.waitForSelector('[data-sell]', { timeout: 120000 }).catch(() => {});
+    const card = () => p.$eval('[data-sell] .actions', (e) => e.innerText.replace(/\n+/g, ' | '));
+    ok('[other account] not connected: the card offers "Connect wallet" and says which wallet is needed', !!(await p.$('[data-sell] [data-wallet="connect"]')) && /Connect the wallet that owns this position/.test(await card()) && (await p.$eval('[data-sell] [data-act="offer"]', (e) => e.disabled)), await card());
+    await p.evaluate(() => { window.__w.st.pick = window.__w.b; });
+    await p.click('[data-sell] [data-wallet="connect"]');
+    await p.waitForFunction(() => /0x0050/.test(document.getElementById('connect').textContent), null, { timeout: 15000 }).catch(() => {});
+    ok('[other account] connected as a different account: the card names both and offers "Switch account"', /You are connected as 0x0050…4a37, but this position belongs to 0x58C6…8EC5/.test(await card()) && !!(await p.$('[data-sell] [data-wallet="switch"]')) && (await p.$eval('[data-sell] [data-act="offer"]', (e) => e.disabled)), await card());
+    ok('[other account] the looked-up wallet stays on screen', (await p.$eval('#addr', (e) => e.value)) === OWNER);
+    await p.evaluate((o) => { window.__w.st.pick = o.toLowerCase(); }, OWNER);
+    await p.click('[data-sell] [data-wallet="switch"]');
+    await p.waitForFunction(() => { const x = document.querySelector('[data-sell] [data-act="offer"]'); return x && !x.disabled; }, null, { timeout: 20000 }).catch(() => {});
+    ok('[other account] after switching to the owner, "Offer it" is on', !(await p.$eval('[data-sell] [data-act="offer"]', (e) => e.disabled)) && /Two confirmations/.test(await card()), (await label(p)) + ' / ' + (await card()));
+
+    // the account is changed inside the wallet while the visitor is in another tab: on return the page follows
+    await p.evaluate(() => { window.__w.st.allowed = [window.__w.b]; });
+    await p.waitForTimeout(3200);
+    await p.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await p.waitForFunction(() => /0x0050/.test(document.getElementById('connect').textContent), null, { timeout: 15000 }).catch(() => {});
+    ok('[other account] coming back to the tab picks up the account now selected in the wallet', (await label(p)) === '0x0050…4a37', await label(p));
+    await c.close(); }
+
   // phone width: the open menu stays on screen
   { const c = await b.newContext({ viewport: { width: 360, height: 740 } }); const p = await c.newPage();
     p.on('pageerror', (e) => errs.push('phone: ' + e.message));

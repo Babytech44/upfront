@@ -362,6 +362,15 @@
       : '<div class="empty">This wallet has no offers yet.</div>';
   }
 
+  // what stands beside a greyed-out "Offer it": says why it is off and offers the way out
+  function offerHint(owner, isMine) {
+    const note = (t, cls = '') => `<span class="note ${cls}" style="align-self:center">${t}</span>`;
+    if (isMine) return note('Two confirmations: allow, then offer.');
+    if (same(owner, EXAMPLE)) return note('Example only. Press Use my wallet to offer your own.');
+    if (!S.account) return '<button class="ghost small" data-wallet="connect">Connect wallet</button>' + note('Connect the wallet that owns this position to offer it.');
+    return '<button class="ghost small" data-wallet="switch">Switch account</button>' + note(`You are connected as ${short(S.account)}, but this position belongs to ${short(owner)}.`, 'warn');
+  }
+
   function sellCard(p, owner) {
     const head = `<div class="row"><div><b>Position #${p.tokenId}</b> <span class="tag">${fmtBtc(p.amount)} BTC</span> <span class="tag">${boostText(p.boost)}</span></div>
       <span class="note">earns about <b>${fmt(p.weekly)} MUSD</b> a week</span></div>`;
@@ -391,7 +400,7 @@
       ${p.blocked && !p.onPool ? `<div class="note warn">${p.blocked} You can still offer it now.</div>` : ''}
       <div class="actions">
         <button data-act="offer" data-id="${p.tokenId}" ${isMine ? '' : 'disabled'}>Offer it</button>
-        ${isMine ? '<span class="note" style="align-self:center">Two confirmations: allow, then offer.</span>' : '<span class="note" style="align-self:center">Connect this wallet to make the offer.</span>'}
+        ${offerHint(owner, isMine)}
       </div>
     </div>`;
   }
@@ -430,10 +439,11 @@
     const { addr, positions } = S.lookup;
     const inUpfront = S.offers.filter((o) => same(o.seller, addr) && (o.status === 1 || o.status === 2));
     let html = '';
-    if (same(addr, EXAMPLE) && !same(addr, S.account)) {
+    const demo = same(addr, EXAMPLE) && !same(addr, S.account); // the example: show the calculator, leave out the rest of that wallet
+    if (demo) {
       html += `<div class="note" style="margin-bottom:10px;padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius);background:var(--card, #fff)"><b>This is an example.</b> It is a real position on Mezo testnet that belongs to someone else. Move the slider to see the numbers. To offer your own locked Bitcoin, press <b>Use my wallet</b>.</div>`;
     }
-    if (inUpfront.length) {
+    if (inUpfront.length && !demo) {
       html += `<div class="note" style="margin-bottom:10px">${inUpfront.length} position${inUpfront.length === 1 ? ' of this wallet is' : 's of this wallet are'} already in Upfront: ${inUpfront.map((o) => `offer #${o.id} (${STATUS[o.status].toLowerCase()})`).join(', ')}. See <a href="#mine">My positions</a>.</div>`;
     }
     if (!positions.length) {
@@ -443,9 +453,9 @@
       const usable = positions.filter((p) => p.plain && (p.permanent || p.end > now));
       const other = positions.filter((p) => !usable.includes(p));
       const total = usable.filter((p) => p.permanent).reduce((a, p) => a + p.weekly, 0n);
-      html += `<div class="note" style="margin-bottom:10px">${short(addr)} holds ${positions.length} locked position${positions.length === 1 ? '' : 's'}. ${total > 0n ? `The permanent ones could earn about <b>${fmt(total)} MUSD a week</b> from the savings-vault gauge.` : ''}</div>`;
+      if (!demo) html += `<div class="note" style="margin-bottom:10px">${short(addr)} holds ${positions.length} locked position${positions.length === 1 ? '' : 's'}. ${total > 0n ? `The permanent ones could earn about <b>${fmt(total)} MUSD a week</b> from the savings-vault gauge.` : ''}</div>`;
       if (usable.length) html += `<div class="grid2">${usable.map((p) => sellCard(p, addr)).join('')}</div>`;
-      if (other.length) {
+      if (other.length && !demo) {
         html += `<div class="card" style="margin-top:14px"><b>${other.length} position${other.length === 1 ? '' : 's'} that cannot be offered</b>` +
           other.map((p) => `<div class="row"><span class="k">Position #${p.tokenId} · ${fmtBtc(p.amount)} BTC</span><span class="note">${!p.plain ? 'grant-backed or managed' : 'lock expired: withdraw or re-lock it in the Mezo app'}</span></div>`).join('') + '</div>';
       }
@@ -484,7 +494,9 @@
 
   function closeMenu() { $('walletMenu').hidden = true; $('connect').setAttribute('aria-expanded', 'false'); }
   function showMine() {
-    if (S.account && !S.looking && (!S.lookup || same(S.lookup.addr, EXAMPLE))) { $('addr').value = S.account; doLookup(S.account); }
+    // replaces nothing, or the example (also while the example is still loading); never a wallet looked up on purpose
+    const replaceable = S.looking ? same(S.lookingAddr, EXAMPLE) : !S.lookup || same(S.lookup.addr, EXAMPLE);
+    if (S.account && replaceable) { $('addr').value = S.account; doLookup(S.account); }
   }
   // one place where the connected account changes, so the page follows the wallet
   function setAccount(next) {
@@ -691,24 +703,28 @@
   }
 
   let lookupSeq = 0;
-  async function doLookup(addr) {
+  // quiet: the example shown to a first-time visitor. It leaves the address box alone, and if it cannot be
+  // shown the page falls back to the plain hint instead of an error.
+  async function doLookup(addr, quiet = false) {
     addr = cleanAddr(addr);
     if (!addr) { toast('That does not look like a wallet address. It should start with 0x and have 42 characters.', true); return; }
     const seq = ++lookupSeq;
     S.looking = true;
     S.lookingAddr = addr;
-    $('positions').innerHTML = '<div class="empty">Reading locked positions from Mezo…</div>';
+    $('positions').innerHTML = `<div class="empty">${quiet ? 'Loading an example position from Mezo…' : 'Reading locked positions from Mezo…'}</div>`;
     try {
       if (!S.market) await loadMarket();
       const found = await loadLookup(addr);
       if (seq !== lookupSeq) return; // a newer lookup started meanwhile
-      S.lookup = found;
+      const usable = found.positions.some((p) => p.plain && p.permanent && p.weekly > 0n);
+      S.lookup = quiet && !usable ? null : found;
       S.looking = false;
       renderLookup();
     } catch (e) {
       console.error(e);
       if (seq !== lookupSeq) return;
       S.looking = false;
+      if (quiet) { S.lookup = null; renderLookup(); return; }
       $('positions').innerHTML = '<div class="empty">Could not read this wallet from Mezo. Press Check to try again.</div>';
     }
   }
@@ -718,6 +734,8 @@
     const btn = ev.target.closest('button[data-act]');
     if (btn && !btn.disabled) runAction(btn);
     if (ev.target.closest('[data-example]')) { $('addr').value = EXAMPLE; doLookup(EXAMPLE); }
+    const wal = ev.target.closest('[data-wallet]');
+    if (wal) { if (wal.dataset.wallet === 'switch') switchAccount(); else connect(); }
   });
   document.addEventListener('input', (ev) => {
     const sell = ev.target.closest('[data-sell]');
@@ -764,6 +782,28 @@
     });
   }
 
+  // Coming back to this tab (after locking BTC in the Mezo app, or changing account in the wallet):
+  // follow the wallet's account, and pick up positions that changed meanwhile, without touching a form in use.
+  const shape = (l) => l.positions.map((p) => `${p.tokenId}:${p.amount}:${p.permanent}:${p.plain}`).join('|');
+  let lastSync = 0;
+  async function resync() {
+    if (document.hidden || S.busy || S.looking || !started || Date.now() - lastSync < 3000) return;
+    lastSync = Date.now();
+    try {
+      if (window.ethereum && !isOff()) {
+        const a = await window.ethereum.request({ method: 'eth_accounts' });
+        if (a && a.length && !same(a[0], S.account)) setAccount(ethers.getAddress(a[0])); // an empty answer only means the wallet is locked
+      }
+      if (S.lookup && !S.looking && !S.busy) {
+        const addr = S.lookup.addr;
+        const found = await loadLookup(addr);
+        if (S.lookup && S.lookup.addr === addr && !S.looking && !S.busy && shape(found) !== shape(S.lookup)) { S.lookup = found; renderLookup(); }
+      }
+    } catch (e) { /* nothing to show: the next visit to the tab tries again */ }
+  }
+  document.addEventListener('visibilitychange', resync);
+  window.addEventListener('focus', resync);
+
   // ───────────── start ─────────────
   let started = false;
   async function start() {
@@ -783,6 +823,7 @@
       const accounts = await window.ethereum.request({ method: 'eth_accounts' }).catch(() => []);
       if (accounts && accounts.length) { S.account = ethers.getAddress(accounts[0]); renderAll(); showMine(); } // a returning visitor sees their own positions
     }
+    if (!q && !S.account) doLookup(EXAMPLE, true); // a first-time visitor sees the calculator working on a real position
     // keep the numbers fresh without resetting a form the visitor is filling in
     setInterval(async () => {
       if (S.busy) return;

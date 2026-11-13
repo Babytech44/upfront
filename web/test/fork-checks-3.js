@@ -164,6 +164,25 @@ const musdOf = (a) => BigInt(cast(`call ${MUSD} "balanceOf(address)(uint256)" ${
   ok('F5 a bare wallet error still gives a readable line', /The wallet reported: Internal JSON-RPC error\./.test(t), t);
   await p.context().close();
 
+  // R1: a position arrives in the wallet while the visitor is in another tab (they just locked BTC in the Mezo app):
+  // on return it shows by itself, without Check or a reload
+  await rpc('anvil_setBalance', [A.THIRD, '0x8AC7230489E80000']);
+  p = await open(b, A.THIRD);
+  await p.waitForFunction(() => /No locked Bitcoin found/.test(document.getElementById('positions').innerText), null, { timeout: 40000 }).catch(() => {});
+  ok('R1a a wallet with nothing locked is told so', /No locked Bitcoin found in 0x1111…1111/.test(await txt(p, '#positions')), await txt(p, '#positions'));
+  cast(`send ${VE} "transferFrom(address,address,uint256)" ${A.SELLER2} ${A.THIRD} 947 --from ${A.SELLER2} --unlocked`);
+  await p.waitForTimeout(3200);
+  await p.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await p.waitForSelector('[data-sell="947"] [data-act="offer"]:not([disabled])', { timeout: 40000 }).catch(() => {});
+  ok('R1b coming back to the tab shows the new position, ready to offer', !!(await p.$('[data-sell="947"] [data-act="offer"]:not([disabled])')), await txt(p, '#positions'));
+  // and a slider already moved is not reset by a later return to the tab when nothing changed
+  await p.$eval('[data-sell] [data-weeks]', (e) => { e.value = 7; e.dispatchEvent(new Event('input', { bubbles: true })); });
+  await p.waitForTimeout(3200);
+  await p.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await p.waitForTimeout(2500);
+  ok('R1c returning again leaves a slider the visitor moved alone', (await p.$eval('[data-sell] [data-weeks]', (e) => e.value)) === '7');
+  await p.context().close();
+
   ok('no page errors in any step', allLogs.length === 0, allLogs.join(' | '));
   await b.close();
   const failed = res.filter((r) => !r.pass);

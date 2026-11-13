@@ -37,9 +37,26 @@ Transactions on Mezo testnet (all sent from the product's contract or to it, no 
 | Seller approves position #1744 | [`0x15e05331…10df9e`](https://explorer.test.mezo.org/tx/0x15e053312dd58010accf994f84cc56bfe2a791f28304b6d255fe2bbd0b10df9e) |
 | Seller offers 30 MUSD today against 33 MUSD of income (offer 0) | [`0x822a79af…1d2ed5`](https://explorer.test.mezo.org/tx/0x822a79afdb02d6551f3a5bf54043b73578d0aca95d99ad41fe063a17671d2ed5) |
 | Buyer pays 30 MUSD for offer 0; the contract votes the position for the sMUSD gauge | [`0x2cd45a92…ad194f`](https://explorer.test.mezo.org/tx/0x2cd45a923d0de4d09050182d42231678ba5098ea51ea16da74e1e7d06dad194f) |
-| First payout to the buyer | TODO (after Thursday 19 Nov 2026, 00:00 UTC) |
+| Second sale, made in the live web app with MetaMask: seller approves position #1750 | [`0x472245d2…9429be`](https://explorer.test.mezo.org/tx/0x472245d2b5a4d82e0f26686f80d2b5f9000f9c9feec67efa1ec08244ba9429be) |
+| Seller offers 16.05 MUSD today against 17.66 MUSD of income (offer 1) | [`0x0318eacd…587247`](https://explorer.test.mezo.org/tx/0x0318eacdbe5b5efcd8c8181cd0b6f72c8b48ee16f83f0d028d892369c4587247) |
+| Buyer pays 16.05 MUSD for offer 1; the seller receives 15.89 MUSD | [`0x7b2891a1…462bbb`](https://explorer.test.mezo.org/tx/0x7b2891a1d90a25dadec5ab29095863b84c4b7b0656ffa04274ce5c0933462bbb) |
+| First outside tester offers 16.02 MUSD today against 17.63 MUSD of income (offer 2), in the live web app | [`0xe2af0eba…41dfed`](https://explorer.test.mezo.org/tx/0xe2af0eba0e53894f68f286dd70858879e785171379c202b7542f43429241dfed) |
+| First payout to the buyers | TODO (after Thursday 19 Nov 2026, 00:00 UTC) |
 
 > TODO before submitting: video link. The first payout hash can only be added after 19 Nov.
+
+## First outside tester
+
+Offers 0 and 1 were made between the builder's own wallets. Offer 2 was made on 13 Nov 2026 by a friend of the builder, with their own wallet and without help, by following [the tester steps](docs/TESTER_STEPS.md). What they reported, and what changed the same day:
+
+| What the tester said | What changed |
+|---|---|
+| "On the clean site, the slider doesn't show first." | The plain page now opens with a labelled example position and a working slider. A connected wallet's own positions replace it without a second press. |
+| "I had to disconnect my MetaMask from Upfront and reconnect before Offer it actually works." | Not reproduced. Two likely causes were closed: the site being connected to a different account from the one holding the lock (the card now names both accounts and has a **Switch account** button), and a page left open while locking (coming back to the tab now picks up the new position and the wallet's current account). |
+| "It shows a lot of risk review messages that one has to accept." | The wallet asks for confirmation when the contract is allowed to hold the position. That step cannot be removed without redeploying, so the tester steps now say to use a test-only wallet and what to expect. |
+| "It's something I'd use ... just don't really know how yet, since it's all still on testnet." | **How it works** in the app now has one concrete case for a seller and one for a buyer, with mainnet numbers. |
+
+One tester is one tester. Five people from the Mezo community completing a sale is the next milestone.
 
 ## How it works
 
@@ -67,7 +84,7 @@ The seller sells an **amount**, not a number of weeks. Boost comes from veMEZO v
 
 - It reads from Mezo's public RPC, so the numbers, the open offers and every sale in progress show without a wallet.
 - Paste any wallet address to see what its locked positions could get today. A link such as `?wallet=0x...` opens the page with that wallet already checked.
-- A visitor with no locked Bitcoin can press **See an example** to try the calculator on a real testnet position. It is labelled as an example and cannot be offered by anyone but its owner.
+- A first-time visitor sees the calculator working on a real testnet position. It is labelled as an example and cannot be offered by anyone but its owner. A connected wallet's own positions replace it.
 - After **Connect wallet**, the page shows that wallet's own positions straight away.
 - Once connected, the address button opens a small menu with **Switch account** and **Disconnect**. Disconnect is remembered, so the wallet does not reconnect by itself on the next visit.
 - A wallet is asked for only when you press a button that sends a transaction: offer, buy, collect, pay the rest early, cancel.
@@ -84,10 +101,10 @@ python3 -m http.server 8000 --directory web
 `web/test/` holds browser checks written with Playwright:
 
 - `live-checks.js`: 35 checks without a wallet, run in Chromium, Firefox and WebKit. Loading, bad input, wallets with many positions, the sell maths, phone widths, and recovery when Mezo's RPC is unreachable.
-- `example-checks.js`: 21 checks of the example button and of what a visitor sees right after connecting.
-- `wallet-menu-checks.js`: 32 checks of Switch account and Disconnect, with a wallet that supports revoking its permission and one that does not.
+- `example-checks.js`: 23 checks of the example a first-time visitor sees and of what shows right after connecting.
+- `wallet-menu-checks.js`: 37 checks of Switch account and Disconnect, with a wallet that supports revoking its permission and one that does not, and of a position that belongs to a different account from the connected one.
 - `fork-checks-1.js` and `fork-checks-2.js`: 35 checks of every wallet action against a local fork of Mezo testnet, with a stand-in wallet that fails the way MetaMask does. They cover the wrong network, refused requests, offer, cancel, buy, collect, settle, a stale page, a position that voted elsewhere, the first hour after a weekly reset, making a timed lock permanent, and returning a position after the time limit.
-- `fork-checks-3.js`: 15 checks of how transactions are sent: a newly locked position offered and bought, a gas estimate that fails once or keeps failing, and errors that come back from the wallet itself.
+- `fork-checks-3.js`: 18 checks of how transactions are sent: a newly locked position offered and bought, a gas estimate that fails once or keeps failing, errors that come back from the wallet itself, and a position that arrives while the visitor is in another tab.
 - `e2e.js`: the first, shorter run of the main path.
 
 The fork checks reshape the fork's errors to match what Mezo's real RPC returns. The header of each file has the commands.
