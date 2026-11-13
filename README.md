@@ -6,6 +6,9 @@ Mezo Buildathon, Wave 2. Track: DeFi. Status: deployed and source-verified on Me
 
 | | |
 |---|---|
+| Live app | **https://upfront-black.vercel.app** (works without a wallet) |
+| Repository | https://github.com/Babytech44/upfront |
+| Deck | [deck/Upfront-deck.pdf](deck/Upfront-deck.pdf) (10 slides) |
 | Contract (Mezo testnet, 31611) | [`0x5D62b7E4c0Aa860F47A8Ab8B9410986A1fFd8b17`](https://explorer.test.mezo.org/address/0x5D62b7E4c0Aa860F47A8Ab8B9410986A1fFd8b17) |
 | Source | Verified on the explorer (0.8.28, london, optimizer 200). The deployed bytecode matches this repo's build. |
 | First position offered | veBTC #1744 (0.02 BTC, permanent) |
@@ -20,7 +23,7 @@ Transactions on Mezo testnet (all sent from the product's contract or to it, no 
 | Buyer pays 30 MUSD for offer 0; the contract votes the position for the sMUSD gauge | [`0x2cd45a92…ad194f`](https://explorer.test.mezo.org/tx/0x2cd45a923d0de4d09050182d42231678ba5098ea51ea16da74e1e7d06dad194f) |
 | First payout to the buyer | TODO (after Thursday 19 Nov 2026, 00:00 UTC) |
 
-> TODO before submitting: collect hash, live app link, deck PDF, video link.
+> TODO before submitting: video link. The first payout hash can only be added after 19 Nov.
 
 ## How it works
 
