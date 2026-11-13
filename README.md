@@ -85,7 +85,7 @@ python3 -m http.server 8000 --directory web
 
 - `live-checks.js`: 35 checks without a wallet, run in Chromium, Firefox and WebKit. Loading, bad input, wallets with many positions, the sell maths, phone widths, and recovery when Mezo's RPC is unreachable.
 - `example-checks.js`: 21 checks of the example button and of what a visitor sees right after connecting.
-- `wallet-menu-checks.js`: 29 checks of Switch account and Disconnect, with a wallet that supports revoking its permission and one that does not.
+- `wallet-menu-checks.js`: 32 checks of Switch account and Disconnect, with a wallet that supports revoking its permission and one that does not.
 - `fork-checks-1.js` and `fork-checks-2.js`: 35 checks of every wallet action against a local fork of Mezo testnet, with a stand-in wallet that fails the way MetaMask does. They cover the wrong network, refused requests, offer, cancel, buy, collect, settle, a stale page, a position that voted elsewhere, the first hour after a weekly reset, making a timed lock permanent, and returning a position after the time limit.
 - `fork-checks-3.js`: 15 checks of how transactions are sent: a newly locked position offered and bought, a gas estimate that fails once or keeps failing, and errors that come back from the wallet itself.
 - `e2e.js`: the first, shorter run of the main path.

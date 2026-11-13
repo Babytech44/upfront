@@ -492,23 +492,37 @@
     S.account = next;
     closeMenu();
     renderAll();
-    if (prev && !same(prev, next) && S.lookup && same(S.lookup.addr, prev) && !S.looking) {
-      if (next) { $('addr').value = next; doLookup(next); } else { S.lookup = null; $('addr').value = ''; renderLookup(); }
+    // if the Sell section shows (or is still loading) the previous account, it follows the wallet
+    const shown = S.looking ? S.lookingAddr : S.lookup && S.lookup.addr;
+    if (prev && !same(prev, next) && same(shown, prev)) {
+      if (next) { $('addr').value = next; doLookup(next); }
+      else { lookupSeq++; S.looking = false; S.lookup = null; $('addr').value = ''; renderLookup(); } // also drops a lookup still on its way
     }
   }
+  // Switching is "disconnect, then connect" in one press: that is the path on which wallets reliably show their
+  // account picker. Asking for permissions again while still connected is answered silently by some wallets.
   async function switchAccount() {
     closeMenu();
+    let revoked = false;
+    try { await window.ethereum.request({ method: 'wallet_revokePermissions', params: [{ eth_accounts: {} }] }); revoked = true; }
+    catch (e) { /* older wallets cannot revoke: ask them for the picker directly below */ }
     try {
-      await window.ethereum.request({ method: 'wallet_requestPermissions', params: [{ eth_accounts: {} }] });
-      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-      if (!accounts || !accounts.length) return;
+      if (!revoked) await window.ethereum.request({ method: 'wallet_requestPermissions', params: [{ eth_accounts: {} }] });
+      const accounts = await window.ethereum.request({ method: revoked ? 'eth_requestAccounts' : 'eth_accounts' });
+      if (!accounts || !accounts.length) throw { code: 4001 };
       await ensureChain();
       setOff(false);
       setAccount(ethers.getAddress(accounts[0]));
       showMine();
       toast(`Now using ${short(S.account)}.`);
     } catch (e) {
-      toast(cannotDo(e) ? 'This wallet cannot switch accounts from a website. Change the account inside the wallet instead.' : explain(e), true);
+      if (revoked) { // the wallet is already disconnected at this point: say so rather than pretend nothing happened
+        setOff(true);
+        setAccount(null);
+        toast('No account was chosen, so the wallet is now disconnected. Press Connect wallet to choose one.', true);
+      } else {
+        toast(cannotDo(e) ? 'This wallet cannot switch accounts from a website. Use Disconnect, then Connect wallet.' : explain(e), true);
+      }
     }
   }
   async function disconnect() {
@@ -682,6 +696,7 @@
     if (!addr) { toast('That does not look like a wallet address. It should start with 0x and have 42 characters.', true); return; }
     const seq = ++lookupSeq;
     S.looking = true;
+    S.lookingAddr = addr;
     $('positions').innerHTML = '<div class="empty">Reading locked positions from Mezo…</div>';
     try {
       if (!S.market) await loadMarket();

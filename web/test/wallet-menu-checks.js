@@ -23,9 +23,10 @@ const mock = ([a, b, modern]) => {
       calls.push(method);
       if (method === 'eth_chainId') return '0x7b7b';
       if (method === 'eth_accounts') return st.allowed;
-      if (method === 'eth_requestAccounts') { if (!st.allowed.length) { if (st.reject) throw err(4001, 'User rejected the request.'); st.allowed = [st.pick]; save(); } return st.allowed; }
+      if (method === 'eth_requestAccounts') { if (!st.allowed.length) { if (st.reject) throw err(4001, 'User rejected the request.'); st.allowed = [st.pick]; save(); (subs.accountsChanged || []).forEach((f) => f(st.allowed)); } return st.allowed; }
       if (method === 'wallet_requestPermissions') {
         if (!modern) throw err(-32601, 'The method "wallet_requestPermissions" does not exist / is not available.');
+        if (st.allowed.length) return [{ parentCapability: 'eth_accounts' }]; // already connected: answers silently, no picker
         if (st.reject) throw err(4001, 'User rejected the request.');
         st.allowed = [st.pick]; save(); (subs.accountsChanged || []).forEach((f) => f(st.allowed)); return [{ parentCapability: 'eth_accounts' }];
       }
@@ -60,19 +61,31 @@ const ready = (p) => p.waitForFunction(() => !document.getElementById('st-pay').
     await p.click('#connect'); await p.click('h1');
     ok(`[${tag}] clicking elsewhere closes the menu`, !(await p.isVisible('#walletMenu')));
 
-    // the visitor refuses the wallet's account picker
-    await p.evaluate(() => { window.__w.st.reject = true; window.__w.st.pick = window.__w.b; });
-    await p.click('#connect'); await p.click('#switchAcct'); await p.waitForTimeout(600);
-    ok(`[${tag}] refusing the picker keeps the account`, (await label(p)) === '0xC6Bd…3934' && (modern ? /You cancelled/.test(await toast(p)) : /cannot switch accounts from a website/.test(await toast(p))), await toast(p));
-    await p.evaluate(() => { window.__w.st.reject = false; });
+    if (!modern) {
+      await p.click('#connect'); await p.click('#switchAcct'); await p.waitForTimeout(600);
+      ok(`[${tag}] Switch account says what to do instead`, (await label(p)) === '0xC6Bd…3934' && /Use Disconnect, then Connect wallet/.test(await toast(p)), await toast(p));
+    }
 
     if (modern) {
+      await p.evaluate(() => { window.__w.st.pick = window.__w.b; });
       await p.click('#connect'); await p.click('#switchAcct');
       await p.waitForFunction(() => /0x0050/.test(document.getElementById('connect').textContent), null, { timeout: 15000 }).catch(() => {});
       ok(`[${tag}] Switch account moves to the account picked in the wallet`, (await label(p)) === '0x0050…4a37' && /Now using 0x0050…4a37/.test(await toast(p)), (await label(p)) + ' / ' + (await toast(p)));
+      const calls = await p.evaluate(() => window.__w.calls.slice(-6));
+      ok(`[${tag}] it does so by revoking and asking again, which shows the wallet's picker`, calls.includes('wallet_revokePermissions') && calls.includes('eth_requestAccounts'), calls.join(','));
       await p.waitForFunction(() => /0x0050…4a37/.test(document.getElementById('positions').innerText), null, { timeout: 40000 }).catch(() => {});
       ok(`[${tag}] the Sell section follows to the new account`, /0x0050…4a37/.test(await p.$eval('#positions', (e) => e.innerText)) && (await p.$eval('#addr', (e) => e.value)).toLowerCase() === B);
       ok(`[${tag}] My positions shows the new account's sales`, /You sold|You bought/.test(await p.$eval('#mineList', (e) => e.innerText)));
+      // closing the picker without choosing leaves the wallet disconnected, and the page says so
+      await p.evaluate(() => { window.__w.st.reject = true; });
+      await p.click('#connect'); await p.click('#switchAcct'); await p.waitForTimeout(700);
+      ok(`[${tag}] closing the picker without choosing: disconnected, with a clear message`, (await label(p)) === 'Connect wallet' && /No account was chosen/.test(await toast(p)), await toast(p));
+      await p.reload({ waitUntil: 'load' }); await ready(p); await p.waitForTimeout(600);
+      ok(`[${tag}] and it stays disconnected after a reload`, (await label(p)) === 'Connect wallet');
+      await p.evaluate(() => { window.__w.st.reject = false; window.__w.st.pick = window.__w.b; });
+      await p.click('#connect');
+      await p.waitForFunction(() => /0x0050/.test(document.getElementById('connect').textContent), null, { timeout: 15000 }).catch(() => {});
+      ok(`[${tag}] Connect wallet works again afterwards`, (await label(p)) === '0x0050…4a37', await label(p));
     }
 
     await p.click('#connect'); await p.click('#disconnect'); await p.waitForTimeout(500);
