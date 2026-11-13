@@ -71,7 +71,7 @@
     musd: new ethers.Contract(CFG.musd, ABI.musd, rpc),
   };
 
-  const S = { account: null, signer: null, market: null, offers: [], lookup: null, busy: false, looking: false };
+  const S = { account: null, market: null, offers: [], lookup: null, busy: false, looking: false };
   // a real Mezo testnet wallet with a locked position, shown when a visitor presses "See an example"
   const EXAMPLE = '0xC6Bd6baD18F7c31fE002c94010D49cD812E93934';
 
@@ -146,16 +146,37 @@
     }
     return null;
   }
+  // every human-readable message inside an error, outermost first
+  function messagesOf(e, depth = 0, out = []) {
+    if (!e || depth > 5 || typeof e !== 'object') return out;
+    for (const k of ['shortMessage', 'message', 'reason']) { let v; try { v = e[k]; } catch (x) { continue; } if (typeof v === 'string' && v && !out.includes(v)) out.push(v); }
+    for (const k of ['error', 'info', 'data', 'cause', 'originalError', 'payload']) { let v; try { v = e[k]; } catch (x) { continue; } messagesOf(v, depth + 1, out); }
+    return out;
+  }
+  function codesOf(e, depth = 0, out = []) {
+    if (!e || depth > 5 || typeof e !== 'object') return out;
+    let c; try { c = e.code; } catch (x) { c = undefined; }
+    if (c !== undefined) out.push(c);
+    for (const k of ['error', 'info', 'data', 'cause', 'originalError']) { let v; try { v = e[k]; } catch (x) { continue; } codesOf(v, depth + 1, out); }
+    return out;
+  }
   function explain(e) {
-    const inner = e && e.info && e.info.error;
-    if (e && (e.code === 'ACTION_REJECTED' || e.code === 4001 || (inner && inner.code === 4001))) return 'You cancelled the request in your wallet.';
+    if (e && e.plain) return e.plain;
+    const codes = codesOf(e);
+    const msgs = messagesOf(e);
+    const all = msgs.join(' | ') || String(e);
+    if (codes.includes(4001) || codes.includes('ACTION_REJECTED') || /user (rejected|denied)/i.test(all)) return 'You cancelled the request in your wallet.';
     const name = findError(e);
     if (name) return ERRORS[name];
-    const msg = (e && (e.shortMessage || e.message)) || String(e);
-    if (/insufficient funds/i.test(msg)) return 'Not enough test BTC in this wallet to pay for gas.';
-    if (/failed to fetch|network|timeout/i.test(msg)) return 'Could not reach the Mezo network. Try again.';
-    if (e && e.code === 'CALL_EXCEPTION') return 'Mezo refused this transaction. The offer may have changed: refresh the page and try again.';
-    return esc(msg.length > 180 ? msg.slice(0, 180) + '…' : msg);
+    if (/insufficient funds|insufficient balance/i.test(all)) return 'Not enough test BTC in this wallet to pay for gas.';
+    if (codes.includes('CALL_EXCEPTION') || /execution reverted/i.test(all)) return 'Mezo refused this transaction. The offer may have changed: refresh the page and try again.';
+    if (codes.includes(-32002) || /already pending/i.test(all)) return 'Your wallet already has a request waiting. Open the wallet, finish or reject it, then try again.';
+    if (codes.includes(4100) || /not been authorized|unauthorized/i.test(all)) return 'Your wallet has not allowed this site to use that account. Press Connect wallet again.';
+    if (/failed to fetch|network|timeout|too many|rate limit/i.test(all)) return 'Could not reach the Mezo network. Wait a few seconds and try again.';
+    // show the wallet's or the node's own words, not the library's wrapper around them
+    const own = msgs.filter((m) => !/could not coalesce|Internal JSON-RPC error|missing revert data/i.test(m));
+    const msg = own.length ? own[own.length - 1] : all;
+    return 'The wallet reported: ' + esc(msg.length > 220 ? msg.slice(0, 220) + '…' : msg);
   }
 
   // ───────────── reads ─────────────
@@ -461,8 +482,6 @@
     try {
       const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
       await ensureChain();
-      const bp = new ethers.BrowserProvider(window.ethereum);
-      S.signer = await bp.getSigner();
       S.account = ethers.getAddress(accounts[0]);
       renderAll();
       return true;
@@ -486,26 +505,56 @@
     }
   }
 
+  // Transactions go to the wallet as plain EIP-1193 requests, the way the Mezo app sends them.
+  // Gas is worked out on Mezo's public RPC first. Mezo's gas estimate gives no reason when a call would fail,
+  // so in that case the call is replayed with eth_call, which does return the contract's error.
+  async function sendCall(from, contract, method, args) {
+    const call = { from, to: contract.target, data: contract.interface.encodeFunctionData(method, args) };
+    let gas = null;
+    for (let attempt = 0; attempt < 2 && gas === null; attempt++) {
+      try {
+        gas = await rpc.estimateGas(call);
+      } catch (e) {
+        await rpc.call(call); // throws with the contract's own error if the transaction would fail
+        if (attempt === 0) await new Promise((r) => setTimeout(r, 1200)); // the call is fine: the estimate itself hiccuped, try once more
+      }
+    }
+    const tx = { from, to: call.to, data: call.data };
+    if (gas !== null) tx.gas = ethers.toQuantity((gas * 13n) / 10n); // otherwise the wallet estimates it
+    const hash = await window.ethereum.request({ method: 'eth_sendTransaction', params: [tx] });
+    if (!/^0x[0-9a-fA-F]{64}$/.test(String(hash))) throw { plain: 'The wallet did not return a transaction. Check its activity list before trying again.' };
+    return hash;
+  }
+
   async function writer() {
     if (!S.account && !(await connect())) return null;
     await ensureChain();
-    const bp = new ethers.BrowserProvider(window.ethereum);
-    S.signer = await bp.getSigner();
-    return {
-      up: new ethers.Contract(CFG.up, ABI.up, S.signer),
-      ve: new ethers.Contract(CFG.ve, ABI.ve, S.signer),
-      musd: new ethers.Contract(CFG.musd, ABI.musd, S.signer),
-    };
+    const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+    if (accounts && accounts.length) S.account = ethers.getAddress(accounts[0]);
+    else if (!(await connect())) return null;
+    const from = S.account;
+    const via = (contract) => new Proxy({}, { get: (_, method) => (...args) => sendCall(from, contract, method, args) });
+    return { up: via(R.up), ve: via(R.ve), musd: via(R.musd) };
+  }
+
+  async function waitMined(hash, ms = 120000) {
+    const until = Date.now() + ms;
+    while (Date.now() < until) {
+      const receipt = await rpc.getTransactionReceipt(hash).catch(() => null);
+      if (receipt) return receipt;
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+    return null;
   }
 
   async function send(label, fn) {
     toast(`${label}: confirm in your wallet…`, false, true);
-    const tx = await fn();
-    toast(`${label}: waiting for Mezo… ${txLink(tx.hash)}`, false, true);
-    await tx.wait();
-    // the page reads from Mezo's public RPC, which can be a block behind the wallet's: wait until it has the transaction too
-    await rpc.waitForTransaction(tx.hash, 1, 20000).catch(() => {});
-    return tx.hash;
+    const hash = await fn();
+    toast(`${label}: waiting for Mezo… ${txLink(hash)}`, false, true);
+    const receipt = await waitMined(hash);
+    if (!receipt) throw { plain: `Sent, but Mezo has not confirmed it after two minutes. Check it before trying again: ${txLink(hash)}` };
+    if (receipt.status !== 1) throw { plain: `Mezo did not accept this transaction. ${txLink(hash)}` };
+    return hash;
   }
 
   // ───────────── actions ─────────────
@@ -634,8 +683,7 @@
     if (!S.looking && (!S.lookup || same(S.lookup.addr, EXAMPLE))) { $('addr').value = S.account; doLookup(S.account); }
   });
   if (window.ethereum && window.ethereum.on) {
-    window.ethereum.on('accountsChanged', (a) => { S.account = a.length ? ethers.getAddress(a[0]) : null; S.signer = null; renderAll(); });
-    window.ethereum.on('chainChanged', () => { S.signer = null; });
+    window.ethereum.on('accountsChanged', (a) => { S.account = a.length ? ethers.getAddress(a[0]) : null; renderAll(); });
   }
 
   // ───────────── start ─────────────

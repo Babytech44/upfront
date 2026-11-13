@@ -22,7 +22,20 @@ async function open(browser, account, query = '', opts = {}) {
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 900 } });
   const p = await ctx.newPage();
   p.on('pageerror', (e) => allLogs.push('pageerror: ' + e.message));
-  await p.route('https://rpc.test.mezo.org/**', async (route) => { const r = await fetch(ANVIL, { method: 'POST', headers: { 'content-type': 'application/json' }, body: route.request().postData() }); await route.fulfill({ status: 200, contentType: 'application/json', body: await r.text() }); });
+  // the page's reads go to the fork; errors are reshaped to what Mezo's real RPC returns (Anvil's are friendlier):
+  // a failed gas estimate carries no reason at all, a failed eth_call carries code 3 and the contract's error data
+  await p.route('https://rpc.test.mezo.org/**', async (route) => {
+    const body = route.request().postData(); const sent = JSON.parse(body); const list = Array.isArray(sent) ? sent : [sent];
+    const r = await fetch(ANVIL, { method: 'POST', headers: { 'content-type': 'application/json' }, body });
+    const got = await r.json(); const outs = Array.isArray(got) ? got : [got];
+    for (const o of outs) {
+      if (!o.error) continue;
+      const m = (list.find((q) => q.id === o.id) || {}).method;
+      if (m === 'eth_estimateGas') o.error = { code: -32000, message: 'rpc error: code = Unknown desc = execution reverted' };
+      else if (m === 'eth_call') o.error = { code: 3, message: 'execution reverted', data: typeof o.error.data === 'string' ? o.error.data : '0x' };
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(Array.isArray(got) ? outs : outs[0]) });
+  });
   await p.addInitScript(([acct, anvil, o]) => {
     let n = 1; const subs = {};
     const w = window.__w = Object.assign({ acct, chain: '0x7b7b', rejectTx: false, rejectSwitch: false, unknownChain: false, calls: [] }, o);
