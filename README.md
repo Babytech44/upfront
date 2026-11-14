@@ -25,6 +25,7 @@ One difference: this rent is not fixed. Mezo sets it each week. If it falls, the
 | Live app | **https://upfront-black.vercel.app** (works without a wallet) |
 | Repository | https://github.com/Babytech44/upfront |
 | Deck | [deck/Upfront-deck.pdf](deck/Upfront-deck.pdf) (11 slides) |
+| Video (1:32) | https://youtu.be/TiNtmd1J1M8 |
 | Contract (Mezo testnet, 31611) | [`0x5D62b7E4c0Aa860F47A8Ab8B9410986A1fFd8b17`](https://explorer.test.mezo.org/address/0x5D62b7E4c0Aa860F47A8Ab8B9410986A1fFd8b17) |
 | Source | Verified on the explorer (0.8.28, london, optimizer 200). The deployed bytecode matches this repo's build. |
 | First position offered | veBTC #1744 (0.02 BTC, permanent) |
@@ -45,7 +46,7 @@ Transactions on Mezo testnet (all sent from the product's contract or to it, no 
 | Second outside tester offers 16.02 MUSD today against 17.63 MUSD of income (offer 3), in the live web app | [`0x2cf6d3c6…c04ce2`](https://explorer.test.mezo.org/tx/0x2cf6d3c6b05b5bdf216da2575aeab0336047f32b89e6e9751b1de3e0b2c04ce2) |
 | First payout to the buyers | TODO (after Thursday 19 Nov 2026, 00:00 UTC) |
 
-> TODO before submitting: video link. The first payout hash can only be added after 19 Nov.
+> The first payout hash can only be added after Mezo's weekly payout on Thursday 19 Nov 2026.
 
 ## Outside testers
 
