@@ -41,6 +41,7 @@ Transactions on Mezo testnet (all sent from the product's contract or to it, no 
 | Seller offers 16.05 MUSD today against 17.66 MUSD of income (offer 1) | [`0x0318eacd…587247`](https://explorer.test.mezo.org/tx/0x0318eacdbe5b5efcd8c8181cd0b6f72c8b48ee16f83f0d028d892369c4587247) |
 | Buyer pays 16.05 MUSD for offer 1; the seller receives 15.89 MUSD | [`0x7b2891a1…462bbb`](https://explorer.test.mezo.org/tx/0x7b2891a1d90a25dadec5ab29095863b84c4b7b0656ffa04274ce5c0933462bbb) |
 | First outside tester offers 16.02 MUSD today against 17.63 MUSD of income (offer 2), in the live web app | [`0xe2af0eba…41dfed`](https://explorer.test.mezo.org/tx/0xe2af0eba0e53894f68f286dd70858879e785171379c202b7542f43429241dfed) |
+| Buyer (the builder's second wallet) pays 16.02 MUSD for offer 2; the tester receives 15.86 MUSD | [`0xea515479…778010`](https://explorer.test.mezo.org/tx/0xea5154790118a92c4fcdbede32e2198450f0718317ae873f2f4771f8fa778010) |
 | Second outside tester offers 16.02 MUSD today against 17.63 MUSD of income (offer 3), in the live web app | [`0x2cf6d3c6…c04ce2`](https://explorer.test.mezo.org/tx/0x2cf6d3c6b05b5bdf216da2575aeab0336047f32b89e6e9751b1de3e0b2c04ce2) |
 | First payout to the buyers | TODO (after Thursday 19 Nov 2026, 00:00 UTC) |
 
@@ -58,6 +59,8 @@ Offers 0 and 1 were made between the builder's own wallets. Offer 2 was made on 
 | "It's something I'd use ... just don't really know how yet, since it's all still on testnet." | **How it works** in the app now has one concrete case for a seller and one for a buyer, with mainnet numbers. |
 
 A second friend of the builder made offer 3 later the same day, after these changes were live. Their position was locked at 23:37 UTC and offered at 23:38 UTC.
+
+The builder then bought offer 2 from a second wallet, so the first tester's sale is complete and their position is now earning for the buyer. Offer 3 is left open on purpose, so that a visitor can see a live offer under **Buy** and take it.
 
 Two testers are a start, and both know the builder. Five people from the Mezo community completing a sale is the next milestone.
 
